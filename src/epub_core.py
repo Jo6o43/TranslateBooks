@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.config import INPUT_FILE, OUTPUT_FILE
 from src.chunker import DomBatcher, parse_translated_batch
 from src.translator import translate_batch_cached
+from src.db_cache import close_and_clear_cache
 
 def process_single_batch(batch_tuple):
     xml_payload, original_tags = batch_tuple
@@ -61,3 +62,7 @@ def process_epub():
     book.set_language('pt-BR')
     epub.write_epub(OUTPUT_FILE, book)
     print(f"\n[SUCCESS] Translation completed successfully. Saved as: {OUTPUT_FILE}")
+    
+    # Limpa a cache porque o programa terminou com sucesso a 100%
+    close_and_clear_cache()
+    print("[INFO] Database cache was successfully cleared.")
