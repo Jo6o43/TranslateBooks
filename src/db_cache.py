@@ -2,8 +2,8 @@ import sqlite3
 import hashlib
 import os
 import threading
-from src.config import DB_PATH
 
+DB_PATH = "database/cache.sqlite"
 _db_lock = threading.Lock()
 
 def _get_connection():

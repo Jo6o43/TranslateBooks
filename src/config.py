@@ -1,12 +1,8 @@
+from dataclasses import dataclass, field
 import os
+import threading
 
-INPUT_FILE = "books_IN/Rakudai Kishi no Eiyuutan - 01.epub"
-OUTPUT_FILE = "books_OUT/Rakudai Kishi no Eiyuutan - 01_try3.epub"
-MODEL_NAME = "qwen3-v1-8b-instruct"
-BASE_URL = "http://127.0.0.1:1234/v1"
-DB_PATH = "database/cache.sqlite"
-
-SYSTEM_PROMPT = """
+DEFAULT_SYSTEM_PROMPT = """
 You are an elite literary translator specializing in localizing Light Novels into Brazilian Portuguese (PT-BR).
 Your mission is to provide a fluent, pleasant, and natural translation, respecting the stylistic norms of Brazil.
 
@@ -27,3 +23,14 @@ TECHNICAL OUTPUT RULES:
 - Preserve any internal HTML (like `<a>` or `<span>`) within the `<t>` tags strictly.
 - Return ONLY the final structured XML snippet. No comments, no explanations.
 """
+
+@dataclass
+class AppConfig:
+    input_file: str
+    output_file: str
+    model_name: str = "qwen3-v1-8b-instruct"
+    base_url: str = "http://127.0.0.1:1234/v1"
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    max_workers: int = 3
+    db_path: str = "database/cache.sqlite"
+    cancel_event: threading.Event = field(default_factory=threading.Event)
