@@ -42,6 +42,12 @@ class TranslatorApp(ctk.CTk):
         self.geometry("1180x760")
         self.minsize(980, 640)
 
+        # Suporte para Ícone da Aplicação
+        try:
+            self.iconbitmap(os.path.join(os.path.dirname(__file__), "icon.ico"))
+        except Exception:
+            pass
+
         self.books_in_abs, self.books_out_abs = ensure_books_dirs()
 
         self.configure(fg_color=CURSOR_BG)
@@ -172,31 +178,7 @@ class TranslatorApp(ctk.CTk):
         )
         self.editor_title.grid(row=0, column=0, padx=12, pady=10, sticky="w")
 
-        self.run_controls = ctk.CTkFrame(self.editor_header, fg_color="transparent")
-        self.run_controls.grid(row=0, column=2, padx=10, pady=6, sticky="e")
-
-        self.run_btn = ctk.CTkButton(
-            self.run_controls,
-            text="Run",
-            width=78,
-            corner_radius=R0,
-            fg_color=CURSOR_SUCCESS,
-            hover_color=CURSOR_SUCCESS_HOVER,
-            command=self.start_translation,
-        )
-        self.run_btn.pack(side="left", padx=(0, 8))
-
-        self.stop_btn = ctk.CTkButton(
-            self.run_controls,
-            text="Stop",
-            width=78,
-            corner_radius=R0,
-            fg_color=CURSOR_DANGER,
-            hover_color=CURSOR_DANGER_HOVER,
-            command=self.stop_translation,
-            state="disabled",
-        )
-        self.stop_btn.pack(side="left")
+        # (Run and Stop moved to queue panel footer)
 
         self.editor_body = ctk.CTkFrame(self.editor, fg_color="transparent")
         self.editor_body.grid(row=1, column=0, sticky="nsew")
@@ -297,11 +279,21 @@ class TranslatorApp(ctk.CTk):
         except Exception as e:
             self.log(f"[WARNING] Não foi possível abrir: {path} ({e})")
 
+    def _resolve_path_from_entry(self, entry_widget):
+        d = entry_widget.get().strip()
+        if not d:
+            from src.paths_store import PROJECT_ROOT
+            return str(PROJECT_ROOT)
+        if os.path.isabs(d):
+            return d
+        from src.paths_store import PROJECT_ROOT
+        return os.path.normpath(os.path.join(str(PROJECT_ROOT), d))
+
     def open_books_in_folder(self):
-        self._safe_startfile(self.books_in_abs)
+        self._safe_startfile(self._resolve_path_from_entry(self.books_in_entry))
 
     def open_books_out_folder(self):
-        self._safe_startfile(self.books_out_abs)
+        self._safe_startfile(self._resolve_path_from_entry(self.books_out_entry))
 
     def clear_output(self):
         self.console.configure(state="normal")
@@ -344,11 +336,11 @@ class TranslatorApp(ctk.CTk):
 
         self.queue_open_in_btn = ctk.CTkButton(
             actions,
-            text="Open IN",
-            width=78,
+            text="📂 Abrir IN",
+            width=88,
             corner_radius=R0,
-            fg_color=CURSOR_BG,
-            hover_color="#2a2a2a",
+            fg_color=CURSOR_PANEL,
+            hover_color="#2f2f2f",
             border_width=1,
             border_color=CURSOR_BORDER,
             command=self.open_books_in_folder,
@@ -357,11 +349,11 @@ class TranslatorApp(ctk.CTk):
 
         self.queue_open_out_btn = ctk.CTkButton(
             actions,
-            text="Open OUT",
+            text="📂 Abrir OUT",
             width=88,
             corner_radius=R0,
-            fg_color=CURSOR_BG,
-            hover_color="#2a2a2a",
+            fg_color=CURSOR_PANEL,
+            hover_color="#2f2f2f",
             border_width=1,
             border_color=CURSOR_BORDER,
             command=self.open_books_out_folder,
@@ -377,12 +369,39 @@ class TranslatorApp(ctk.CTk):
 
         self.queue_hint = ctk.CTkLabel(
             footer,
-            text="Selecione livros no Explorer e clique Run. O progresso detalhado aparece no OUTPUT em baixo.",
+            text="Selecione livros no Explorer e adicione à Queue.",
             text_color=CURSOR_MUTED,
             font=ctk.CTkFont(size=11),
             justify="left",
         )
         self.queue_hint.grid(row=0, column=0, sticky="w")
+
+        # Start / Stop Buttons at the bottom of the Queue
+        self.run_controls = ctk.CTkFrame(footer, fg_color="transparent")
+        self.run_controls.grid(row=0, column=1, sticky="e")
+
+        self.run_btn = ctk.CTkButton(
+            self.run_controls,
+            text="▶ INICIAR TRADUÇÃO",
+            width=140,
+            corner_radius=R0,
+            fg_color=CURSOR_SUCCESS,
+            hover_color=CURSOR_SUCCESS_HOVER,
+            command=self.start_translation,
+        )
+        self.run_btn.pack(side="left", padx=(0, 8))
+
+        self.stop_btn = ctk.CTkButton(
+            self.run_controls,
+            text="⏹ Cancelar",
+            width=90,
+            corner_radius=R0,
+            fg_color=CURSOR_DANGER,
+            hover_color=CURSOR_DANGER_HOVER,
+            command=self.stop_translation,
+            state="disabled",
+        )
+        self.stop_btn.pack(side="left")
 
         self._render_queue()
 
@@ -579,9 +598,22 @@ class TranslatorApp(ctk.CTk):
         wrap = ctk.CTkFrame(parent, fg_color="transparent")
         wrap.pack(fill="both", expand=True)
         wrap.grid_columnconfigure(0, weight=1)
+        wrap.grid_rowconfigure(1, weight=1)
 
-        form = ctk.CTkFrame(wrap, fg_color=CURSOR_PANEL, corner_radius=R0, border_width=1, border_color=CURSOR_BORDER)
-        form.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        top_bar = ctk.CTkFrame(wrap, fg_color="transparent")
+        top_bar.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
+
+        ctk.CTkButton(
+            top_bar,
+            text="Guardar Definições",
+            corner_radius=R0,
+            fg_color=CURSOR_ACCENT,
+            hover_color=CURSOR_ACCENT_HOVER,
+            command=self.save_folder_paths,
+        ).pack(side="left")
+
+        form = ctk.CTkScrollableFrame(wrap, fg_color=CURSOR_PANEL, corner_radius=R0, border_width=1, border_color=CURSOR_BORDER)
+        form.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
         form.grid_columnconfigure(0, weight=1)
 
         s0 = load_app_settings()
@@ -670,15 +702,6 @@ class TranslatorApp(ctk.CTk):
         self.context_checkbox = ctk.CTkCheckBox(form, text="Usar Contexto Anterior (Reduz alucinações de gêneros, ligeiramente mais lento)", corner_radius=R0)
         self.context_checkbox.grid(row=12, column=0, padx=12, pady=(4, 8), sticky="w")
 
-        ctk.CTkButton(
-            form,
-            text="Guardar Definições",
-            corner_radius=R0,
-            fg_color=CURSOR_ACCENT,
-            hover_color=CURSOR_ACCENT_HOVER,
-            command=self.save_folder_paths,
-        ).grid(row=13, column=0, padx=12, pady=(0, 12), sticky="ew")
-
         tip = ctk.CTkLabel(
             wrap,
             text="Pastas ficam em itranslatebooks_config.json (ignorado pelo git). Aumente workers só se a API aguentar.",
@@ -686,7 +709,7 @@ class TranslatorApp(ctk.CTk):
             font=ctk.CTkFont(size=11),
             justify="left",
         )
-        tip.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="w")
+        tip.grid(row=2, column=0, padx=12, pady=(0, 12), sticky="w")
 
     def _build_prompt_view(self, parent):
         wrap = ctk.CTkFrame(parent, fg_color="transparent")
@@ -725,7 +748,13 @@ class TranslatorApp(ctk.CTk):
             cb.destroy()
         self.checkboxes.clear()
         
-        os.makedirs(self.books_in_abs, exist_ok=True)
+        self.books_in_abs = self._resolve_path_from_entry(self.books_in_entry)
+        self.books_out_abs = self._resolve_path_from_entry(self.books_out_entry)
+
+        try:
+            os.makedirs(self.books_in_abs, exist_ok=True)
+        except OSError:
+            pass
 
         pattern = os.path.join(self.books_in_abs, "*.epub")
         files = glob.glob(pattern)
@@ -771,7 +800,13 @@ class TranslatorApp(ctk.CTk):
         if self.is_running:
             return
 
-        self.books_in_abs, self.books_out_abs = ensure_books_dirs()
+        self.books_in_abs = self._resolve_path_from_entry(self.books_in_entry)
+        self.books_out_abs = self._resolve_path_from_entry(self.books_out_entry)
+        try:
+            os.makedirs(self.books_in_abs, exist_ok=True)
+            os.makedirs(self.books_out_abs, exist_ok=True)
+        except OSError:
+            pass
 
         selected_files = [file for cb, file in self.checkboxes if cb.get()]
         if not selected_files:
