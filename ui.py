@@ -568,6 +568,10 @@ class TranslatorApp(ctk.CTk):
                 self.context_checkbox.select()
             else:
                 self.context_checkbox.deselect()
+            if s.get("save_translation_report", False):
+                self.report_checkbox.select()
+            else:
+                self.report_checkbox.deselect()
         self.books_path.configure(text=f"{s['books_in_dir'].rstrip(os.sep).rstrip('/')}/")
         self.status_right.configure(text=f"{s['books_in_dir']} → {s['books_out_dir']}")
 
@@ -576,7 +580,8 @@ class TranslatorApp(ctk.CTk):
             self.books_in_entry.get(),
             self.books_out_entry.get(),
             self.glossary_text.get("0.0", "end").strip(),
-            bool(self.context_checkbox.get())
+            bool(self.context_checkbox.get()),
+            bool(self.report_checkbox.get()),
         )
         self._sync_books_paths_ui()
         self.refresh_books()
@@ -701,6 +706,15 @@ class TranslatorApp(ctk.CTk):
 
         self.context_checkbox = ctk.CTkCheckBox(form, text="Usar Contexto Anterior (Reduz alucinações de gêneros, ligeiramente mais lento)", corner_radius=R0)
         self.context_checkbox.grid(row=12, column=0, padx=12, pady=(4, 8), sticky="w")
+
+        self.report_checkbox = ctk.CTkCheckBox(
+            form,
+            text="Guardar relatório TXT após tradução (tempos, ficheiros e config — útil para comparar execuções)",
+            corner_radius=R0,
+        )
+        self.report_checkbox.grid(row=13, column=0, padx=12, pady=(0, 8), sticky="w")
+        if s0.get("save_translation_report", False):
+            self.report_checkbox.select()
 
         tip = ctk.CTkLabel(
             wrap,
@@ -878,7 +892,8 @@ class TranslatorApp(ctk.CTk):
                 system_prompt=prompt,
                 max_workers=workers,
                 use_context=use_ctx,
-                cancel_event=self.cancel_event
+                save_translation_report=bool(self.report_checkbox.get()),
+                cancel_event=self.cancel_event,
             )
             
             self.after(0, lambda: self.progress_bar.set(0))

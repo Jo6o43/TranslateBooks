@@ -33,4 +33,5 @@ class AppConfig:
     max_workers: int = 3
     db_path: str = "database/cache.sqlite"
     use_context: bool = True
+    save_translation_report: bool = False
     cancel_event: threading.Event = field(default_factory=threading.Event)

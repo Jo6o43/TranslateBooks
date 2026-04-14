@@ -5,7 +5,7 @@ import os
 import glob
 from src.config import AppConfig
 from src.epub_core import process_epub
-from src.paths_store import ensure_books_dirs, output_path_for_epub
+from src.paths_store import ensure_books_dirs, load_app_settings, output_path_for_epub
 
 def _format_time(seconds):
     m, s = divmod(int(seconds), 60)
@@ -36,12 +36,14 @@ class CLI_Runner:
             self.pbar = None
 
 def run_translation(input_file, output_file, max_workers, model, base_url):
+    s = load_app_settings()
     config = AppConfig(
         input_file=input_file,
         output_file=output_file,
         max_workers=max_workers,
         model_name=model,
-        base_url=base_url
+        base_url=base_url,
+        save_translation_report=bool(s.get("save_translation_report", False)),
     )
     runner = CLI_Runner()
     process_epub(config, log_callback=runner.log, progress_callback=runner.progress)
