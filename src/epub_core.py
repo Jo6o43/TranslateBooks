@@ -7,7 +7,7 @@ from ebooklib import epub
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from src.config import AppConfig
+from src.config import AppConfig, APP_VERSION
 from src.chunker import DomBatcher, parse_translated_batch
 from src.translator import translate_batch_cached
 from src.db_cache import clear_cache_for_epub
@@ -56,7 +56,7 @@ def _write_translation_report(
         out_size = None
 
     lines = [
-        "iTranslateBooks — relatório de tradução",
+        f"iTranslateBooks v{APP_VERSION} — relatório de tradução",
         "=" * 44,
         f"Gerado em (local): {datetime.now().isoformat(timespec='seconds')}",
         "",

@@ -132,4 +132,13 @@ def ensure_books_dirs() -> tuple[str, str]:
 
 def output_path_for_epub(input_epub_path: str, books_out_abs: str) -> str:
     name = os.path.basename(input_epub_path)
-    return os.path.join(books_out_abs, name.replace(".epub", "_PT_BR.epub"))
+    stem = name.replace(".epub", "_PT_BR")
+    candidate = os.path.join(books_out_abs, f"{stem}.epub")
+    if not os.path.exists(candidate):
+        return candidate
+    counter = 2
+    while True:
+        candidate = os.path.join(books_out_abs, f"{stem}_{counter}.epub")
+        if not os.path.exists(candidate):
+            return candidate
+        counter += 1

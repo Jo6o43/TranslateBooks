@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 import os
 import threading
 
+APP_VERSION = "1.4.5"
+
 DEFAULT_LANGUAGE_PROMPT = """You are an elite literary translator specializing in localizing Light Novels into Brazilian Portuguese (PT-BR).
 Your mission is to provide a fluent, pleasant, and natural translation, always respecting the stylistic norms of Brazil.
 

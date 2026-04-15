@@ -5,7 +5,7 @@ import threading
 import time
 from tkinter import filedialog
 
-from src.config import AppConfig, DEFAULT_LANGUAGE_PROMPT, DEFAULT_ADVANCED_PROMPT
+from src.config import AppConfig, DEFAULT_LANGUAGE_PROMPT, DEFAULT_ADVANCED_PROMPT, APP_VERSION
 from src.epub_core import process_epub
 from src.paths_store import (
     ensure_books_dirs,
@@ -244,7 +244,7 @@ class TranslatorApp(ctk.CTk):
         self.progress_bar.pack(side="left", padx=(0, 10))
         self.progress_bar.set(0)
 
-        self.eta_label = ctk.CTkLabel(self.progress_wrap, text="ETA: -- | 0/0", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
+        self.eta_label = ctk.CTkLabel(self.progress_wrap, text="-- | ETA: -- | 0/0", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
         self.eta_label.pack(side="left")
 
         self.console = ctk.CTkTextbox(
@@ -268,6 +268,14 @@ class TranslatorApp(ctk.CTk):
 
         self.status_right = ctk.CTkLabel(self.statusbar, text="", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=11))
         self.status_right.grid(row=0, column=2, padx=10, pady=4, sticky="e")
+
+        self.status_version = ctk.CTkLabel(
+            self.statusbar,
+            text=f"v{APP_VERSION}",
+            text_color=CURSOR_ACCENT,
+            font=ctk.CTkFont(size=11, weight="bold"),
+        )
+        self.status_version.grid(row=0, column=3, padx=(0, 12), pady=4, sticky="e")
 
         # Sidebar content
         self.checkboxes = []
@@ -815,11 +823,15 @@ class TranslatorApp(ctk.CTk):
             command=lambda m=mode: self._add_custom_prompt(m),
         ).pack(side="left", padx=(0, 5))
 
-        ctk.CTkButton(
+        del_btn = ctk.CTkButton(
             top_bar, text="🗑", width=36, corner_radius=R0,
             fg_color=CURSOR_DANGER, hover_color=CURSOR_DANGER_HOVER,
             command=lambda m=mode: self._del_custom_prompt(m),
-        ).pack(side="left")
+        )
+        del_btn.pack(side="left")
+
+        # disable delete for Default on init
+        del_btn.configure(state="disabled")
 
         textbox = ctk.CTkTextbox(
             wrap, fg_color=CURSOR_BG, text_color=CURSOR_TEXT,
@@ -832,18 +844,23 @@ class TranslatorApp(ctk.CTk):
             self.lang_prompt_dropdown = dropdown
             self.lang_prompt_name_entry = name_entry
             self.lang_prompt_text = textbox
+            self.lang_del_btn = del_btn
         else:
             self.adv_prompt_dropdown = dropdown
             self.adv_prompt_name_entry = name_entry
             self.adv_prompt_text = textbox
+            self.adv_del_btn = del_btn
 
     def _on_prompt_selected(self, choice, mode):
         is_lang = (mode == "lang")
         textbox = self.lang_prompt_text if is_lang else self.adv_prompt_text
+        del_btn = self.lang_del_btn if is_lang else self.adv_del_btn
         presets = self.custom_lang_prompts if is_lang else self.custom_adv_prompts
         default = DEFAULT_LANGUAGE_PROMPT if is_lang else DEFAULT_ADVANCED_PROMPT
         textbox.delete("0.0", "end")
         textbox.insert("0.0", presets.get(choice, default))
+        # Only allow delete for non-default presets
+        del_btn.configure(state=("normal" if choice != "Default" else "disabled"))
 
     def _add_custom_prompt(self, mode):
         is_lang = (mode == "lang")
@@ -865,6 +882,7 @@ class TranslatorApp(ctk.CTk):
     def _del_custom_prompt(self, mode):
         is_lang = (mode == "lang")
         dropdown = self.lang_prompt_dropdown if is_lang else self.adv_prompt_dropdown
+        del_btn = self.lang_del_btn if is_lang else self.adv_del_btn
         presets = self.custom_lang_prompts if is_lang else self.custom_adv_prompts
         choice = dropdown.get()
         if choice == "Default":
@@ -874,6 +892,7 @@ class TranslatorApp(ctk.CTk):
             opts = ["Default"] + list(presets.keys())
             dropdown.configure(values=opts)
             dropdown.set("Default")
+            del_btn.configure(state="disabled")
             self._on_prompt_selected("Default", mode)
             self.save_folder_paths()
 
@@ -912,9 +931,22 @@ class TranslatorApp(ctk.CTk):
         self.set_status(f"{len(files)} file(s) found")
 
     def log(self, msg):
+        _MAX_LINES = 800
+        _ARCHIVE_LINES = 250
         def append():
             self.console.configure(state="normal")
             self.console.insert("end", msg + "\n")
+            # Summarize oldest lines instead of silently deleting them
+            try:
+                line_count = int(self.console.index("end-1c").split(".")[0])
+                if line_count > _MAX_LINES:
+                    self.console.delete("1.0", f"{_ARCHIVE_LINES + 1}.0")
+                    self.console.insert(
+                        "1.0",
+                        f"[ … {_ARCHIVE_LINES} linhas anteriores arquivadas para libertar memória … ]\n"
+                    )
+            except Exception:
+                pass
             self.console.see("end")
             self.console.configure(state="disabled")
         self.after(0, append)
@@ -924,10 +956,10 @@ class TranslatorApp(ctk.CTk):
             m, s = divmod(int(eta), 60)
             h, m = divmod(m, 60)
             time_str = f"{h}h {m}m" if h > 0 else f"{m}m {s}s"
-            
+            pct = int(current / total * 100) if total > 0 else 0
             self.progress_bar.set(current / total if total > 0 else 0)
-            self.eta_label.configure(text=f"ETA: {time_str} | {current}/{total}")
-            self.set_status("Running…")
+            self.eta_label.configure(text=f"{pct}% | ETA: {time_str} | {current}/{total}")
+            self.set_status(f"Running… {pct}%")
         self.after(0, update)
 
     def stop_translation(self):
@@ -1026,7 +1058,7 @@ class TranslatorApp(ctk.CTk):
             )
             
             self.after(0, lambda: self.progress_bar.set(0))
-            self.after(0, lambda: self.eta_label.configure(text="ETA: Calculando... | 0/0"))
+            self.after(0, lambda: self.eta_label.configure(text="0% | ETA: Calculando... | 0/0"))
             
             success = process_epub(config, log_callback=self.log, progress_callback=self.update_progress)
             elapsed = time.time() - file_start
