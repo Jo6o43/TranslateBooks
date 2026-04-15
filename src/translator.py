@@ -27,7 +27,7 @@ async def _call_llm(xml_payload: str, config: AppConfig, context_str: str) -> st
     response = await client.chat.completions.create(
         model=config.model_name,
         messages=messages,
-        temperature=0.3
+        temperature=0.4
     )
     return response.choices[0].message.content
 

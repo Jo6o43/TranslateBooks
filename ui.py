@@ -5,7 +5,7 @@ import threading
 import time
 from tkinter import filedialog
 
-from src.config import AppConfig, DEFAULT_SYSTEM_PROMPT
+from src.config import AppConfig, DEFAULT_LANGUAGE_PROMPT, DEFAULT_ADVANCED_PROMPT
 from src.epub_core import process_epub
 from src.paths_store import (
     ensure_books_dirs,
@@ -68,8 +68,9 @@ class TranslatorApp(ctk.CTk):
         
         self.cancel_event = threading.Event()
         self.is_running = False
-        self.active_view = "explorer"  # explorer
-        self.custom_prompts = {}
+        self.active_view = "explorer"
+        self.custom_lang_prompts = {}
+        self.custom_adv_prompts = {}
         
         # Activity bar (VS Code leftmost)
         self.activitybar = ctk.CTkFrame(
@@ -83,27 +84,42 @@ class TranslatorApp(ctk.CTk):
 
         self.btn_explorer = ctk.CTkButton(
             self.activitybar,
-            text="EX",
+            text="📂",
             width=44,
             height=44,
             corner_radius=R0,
             fg_color=CURSOR_ACCENT,
             hover_color=CURSOR_ACCENT_HOVER,
+            font=ctk.CTkFont(size=22),
             command=lambda: self.set_view("explorer"),
         )
         self.btn_explorer.grid(row=0, column=0, padx=6, pady=(8, 6))
 
-        self.btn_prompt = ctk.CTkButton(
+        self.btn_lang_prompt = ctk.CTkButton(
             self.activitybar,
-            text="SP",
+            text="🌐",
             width=44,
             height=44,
             corner_radius=R0,
             fg_color=CURSOR_ACTIVITYBAR,
             hover_color=CURSOR_PANEL,
-            command=lambda: self.set_view("prompt"),
+            font=ctk.CTkFont(size=22),
+            command=lambda: self.set_view("lang_prompt"),
         )
-        self.btn_prompt.grid(row=1, column=0, padx=6, pady=6)
+        self.btn_lang_prompt.grid(row=1, column=0, padx=6, pady=6)
+
+        self.btn_adv_prompt = ctk.CTkButton(
+            self.activitybar,
+            text="🔧",
+            width=44,
+            height=44,
+            corner_radius=R0,
+            fg_color=CURSOR_ACTIVITYBAR,
+            hover_color=CURSOR_PANEL,
+            font=ctk.CTkFont(size=22),
+            command=lambda: self.set_view("adv_prompt"),
+        )
+        self.btn_adv_prompt.grid(row=2, column=0, padx=6, pady=6)
 
         self.btn_settings = ctk.CTkButton(
             self.activitybar,
@@ -113,9 +129,10 @@ class TranslatorApp(ctk.CTk):
             corner_radius=R0,
             fg_color=CURSOR_ACTIVITYBAR,
             hover_color=CURSOR_PANEL,
+            font=ctk.CTkFont(size=22),
             command=lambda: self.set_view("settings"),
         )
-        self.btn_settings.grid(row=2, column=0, padx=6, pady=6)
+        self.btn_settings.grid(row=3, column=0, padx=6, pady=6)
 
         # Side bar (Explorer / Settings)
         self.sidebar = ctk.CTkFrame(
@@ -150,9 +167,10 @@ class TranslatorApp(ctk.CTk):
 
         self.view_explorer = ctk.CTkFrame(self.sidebar_views, fg_color="transparent")
         self.view_settings = ctk.CTkFrame(self.sidebar_views, fg_color="transparent")
-        self.view_prompt = ctk.CTkFrame(self.sidebar_views, fg_color="transparent")
+        self.view_lang_prompt = ctk.CTkFrame(self.sidebar_views, fg_color="transparent")
+        self.view_adv_prompt = ctk.CTkFrame(self.sidebar_views, fg_color="transparent")
 
-        for v in (self.view_explorer, self.view_settings, self.view_prompt):
+        for v in (self.view_explorer, self.view_settings, self.view_lang_prompt, self.view_adv_prompt):
             v.grid(row=0, column=0, sticky="nsew")
 
         # Main editor area (home)
@@ -255,7 +273,8 @@ class TranslatorApp(ctk.CTk):
         self.checkboxes = []
         self._build_explorer_view(self.view_explorer)
         self._build_settings_view(self.view_settings)
-        self._build_prompt_view(self.view_prompt)
+        self._build_prompt_view(self.view_lang_prompt, mode="lang")
+        self._build_prompt_view(self.view_adv_prompt, mode="adv")
         self._sync_books_paths_ui()
         self.refresh_books()
         self.set_view("explorer")
@@ -477,26 +496,29 @@ class TranslatorApp(ctk.CTk):
                 break
         self.after(0, self._render_queue)
 
+    def _all_sidebar_btns(self):
+        return [self.btn_explorer, self.btn_lang_prompt, self.btn_adv_prompt, self.btn_settings]
+
     def set_view(self, view: str):
         self.active_view = view
+        for b in self._all_sidebar_btns():
+            b.configure(fg_color=CURSOR_ACTIVITYBAR, hover_color=CURSOR_PANEL)
         if view == "explorer":
             self.sidebar_title.configure(text="EXPLORER")
             self.view_explorer.tkraise()
             self.btn_explorer.configure(fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER)
-            self.btn_prompt.configure(fg_color=CURSOR_ACTIVITYBAR, hover_color=CURSOR_PANEL)
-            self.btn_settings.configure(fg_color=CURSOR_ACTIVITYBAR, hover_color=CURSOR_PANEL)
-        elif view == "prompt":
-            self.sidebar_title.configure(text="SYSTEM PROMPT")
-            self.view_prompt.tkraise()
-            self.btn_prompt.configure(fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER)
-            self.btn_explorer.configure(fg_color=CURSOR_ACTIVITYBAR, hover_color=CURSOR_PANEL)
-            self.btn_settings.configure(fg_color=CURSOR_ACTIVITYBAR, hover_color=CURSOR_PANEL)
+        elif view == "lang_prompt":
+            self.sidebar_title.configure(text="LANGUAGE PROMPT")
+            self.view_lang_prompt.tkraise()
+            self.btn_lang_prompt.configure(fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER)
+        elif view == "adv_prompt":
+            self.sidebar_title.configure(text="ADVANCED PROMPT")
+            self.view_adv_prompt.tkraise()
+            self.btn_adv_prompt.configure(fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER)
         else:
             self.sidebar_title.configure(text="DEFINIÇÕES")
             self.view_settings.tkraise()
             self.btn_settings.configure(fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER)
-            self.btn_explorer.configure(fg_color=CURSOR_ACTIVITYBAR, hover_color=CURSOR_PANEL)
-            self.btn_prompt.configure(fg_color=CURSOR_ACTIVITYBAR, hover_color=CURSOR_PANEL)
 
     def _build_explorer_view(self, parent):
         self.explorer_view = ctk.CTkFrame(parent, fg_color="transparent")
@@ -581,18 +603,25 @@ class TranslatorApp(ctk.CTk):
             self.worker_slider.set(s.get("max_workers", 3))
             self.slider_label.configure(text=f"Workers: {int(s.get('max_workers', 3))}")
 
-        if hasattr(self, "prompt_text"):
-            self.prompt_text.delete("0.0", "end")
-            self.prompt_text.insert("0.0", s.get("system_prompt", DEFAULT_SYSTEM_PROMPT))
-            self.custom_prompts = s.get("custom_prompts", {})
-            if hasattr(self, "prompt_dropdown"):
-                opts = ["Default"] + list(self.custom_prompts.keys())
-                self.prompt_dropdown.configure(values=opts)
+        self.custom_lang_prompts = s.get("custom_lang_prompts", {})
+        self.custom_adv_prompts = s.get("custom_adv_prompts", {})
+        if hasattr(self, "lang_prompt_text"):
+            self.lang_prompt_text.delete("0.0", "end")
+            self.lang_prompt_text.insert("0.0", s.get("language_prompt", DEFAULT_LANGUAGE_PROMPT))
+            opts = ["Default"] + list(self.custom_lang_prompts.keys())
+            self.lang_prompt_dropdown.configure(values=opts)
+        if hasattr(self, "adv_prompt_text"):
+            self.adv_prompt_text.delete("0.0", "end")
+            self.adv_prompt_text.insert("0.0", s.get("advanced_prompt", DEFAULT_ADVANCED_PROMPT))
+            opts = ["Default"] + list(self.custom_adv_prompts.keys())
+            self.adv_prompt_dropdown.configure(values=opts)
 
         self.books_path.configure(text=f"{s['books_in_dir'].rstrip(os.sep).rstrip('/')}/")
         self.status_right.configure(text=f"{s['books_in_dir']} → {s['books_out_dir']}")
 
     def save_folder_paths(self):
+        lang_text = self.lang_prompt_text.get("0.0", "end").strip() if hasattr(self, "lang_prompt_text") else DEFAULT_LANGUAGE_PROMPT
+        adv_text = self.adv_prompt_text.get("0.0", "end").strip() if hasattr(self, "adv_prompt_text") else DEFAULT_ADVANCED_PROMPT
         save_app_settings(
             self.books_in_entry.get(),
             self.books_out_entry.get(),
@@ -602,8 +631,10 @@ class TranslatorApp(ctk.CTk):
             self.url_entry.get().strip(),
             self.model_entry.get().strip(),
             int(self.worker_slider.get()),
-            self.prompt_text.get("0.0", "end").strip(),
-            self.custom_prompts
+            lang_text,
+            self.custom_lang_prompts,
+            adv_text,
+            self.custom_adv_prompts,
         )
         self._sync_books_paths_ui()
         self.refresh_books()
@@ -747,76 +778,103 @@ class TranslatorApp(ctk.CTk):
         )
         tip.grid(row=2, column=0, padx=12, pady=(0, 12), sticky="w")
 
-    def _build_prompt_view(self, parent):
+    def _build_prompt_view(self, parent, mode: str):
+        """mode='lang' for Language Prompt, mode='adv' for Advanced Prompt."""
+        is_lang = (mode == "lang")
+        default_text = DEFAULT_LANGUAGE_PROMPT if is_lang else DEFAULT_ADVANCED_PROMPT
+        hint_text = (
+            "Regras de linguagem, estilo e concordância. Suporta {GLOSSARY_SECTION}."
+            if is_lang else
+            "Regras técnicas de formatação XML/HTML e Drop Caps."
+        )
+
         wrap = ctk.CTkFrame(parent, fg_color="transparent")
         wrap.pack(fill="both", expand=True)
         wrap.grid_columnconfigure(0, weight=1)
         wrap.grid_rowconfigure(2, weight=1)
 
-        hint = ctk.CTkLabel(
-            wrap,
-            text="Edite as regras/glossário ou selecione um preset salvo nas configurações.",
-            text_color=CURSOR_MUTED,
-            font=ctk.CTkFont(size=12),
-        )
+        hint = ctk.CTkLabel(wrap, text=hint_text, text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
         hint.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
 
         top_bar = ctk.CTkFrame(wrap, fg_color="transparent")
-        top_bar.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        top_bar.grid(row=1, column=0, padx=10, pady=(8, 0), sticky="ew")
 
-        self.prompt_dropdown = ctk.CTkOptionMenu(top_bar, values=["Default"], command=self._on_prompt_selected, corner_radius=R0)
-        self.prompt_dropdown.pack(side="left", padx=(0, 10))
-
-        self.prompt_name_entry = ctk.CTkEntry(top_bar, placeholder_text="Novo Preset...", corner_radius=R0)
-        self.prompt_name_entry.pack(side="left", padx=(0, 10))
-
-        self.add_prompt_btn = ctk.CTkButton(top_bar, text="+", width=36, corner_radius=R0, fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER, command=self._add_custom_prompt)
-        self.add_prompt_btn.pack(side="left", padx=(0, 5))
-
-        self.del_prompt_btn = ctk.CTkButton(top_bar, text="🗑", width=36, corner_radius=R0, fg_color=CURSOR_DANGER, hover_color=CURSOR_DANGER_HOVER, command=self._del_custom_prompt)
-        self.del_prompt_btn.pack(side="left")
-
-        self.prompt_text = ctk.CTkTextbox(
-            wrap,
-            fg_color=CURSOR_BG,
-            text_color=CURSOR_TEXT,
-            border_width=1,
-            border_color=CURSOR_BORDER,
+        dropdown = ctk.CTkOptionMenu(
+            top_bar, values=["Default"],
+            command=lambda c, m=mode: self._on_prompt_selected(c, m),
             corner_radius=R0,
         )
-        self.prompt_text.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
-        self.prompt_text.insert("0.0", DEFAULT_SYSTEM_PROMPT)
+        dropdown.pack(side="left", padx=(0, 10))
 
-    def _on_prompt_selected(self, choice):
-        self.prompt_text.delete("0.0", "end")
-        if choice == "Default":
-            self.prompt_text.insert("0.0", DEFAULT_SYSTEM_PROMPT)
-        elif choice in self.custom_prompts:
-            self.prompt_text.insert("0.0", self.custom_prompts[choice])
+        name_entry = ctk.CTkEntry(top_bar, placeholder_text="Novo Preset...", corner_radius=R0)
+        name_entry.pack(side="left", padx=(0, 10))
 
-    def _add_custom_prompt(self):
-        name = self.prompt_name_entry.get().strip()
+        ctk.CTkButton(
+            top_bar, text="+", width=36, corner_radius=R0,
+            fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER,
+            command=lambda m=mode: self._add_custom_prompt(m),
+        ).pack(side="left", padx=(0, 5))
+
+        ctk.CTkButton(
+            top_bar, text="🗑", width=36, corner_radius=R0,
+            fg_color=CURSOR_DANGER, hover_color=CURSOR_DANGER_HOVER,
+            command=lambda m=mode: self._del_custom_prompt(m),
+        ).pack(side="left")
+
+        textbox = ctk.CTkTextbox(
+            wrap, fg_color=CURSOR_BG, text_color=CURSOR_TEXT,
+            border_width=1, border_color=CURSOR_BORDER, corner_radius=R0,
+        )
+        textbox.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        textbox.insert("0.0", default_text)
+
+        if is_lang:
+            self.lang_prompt_dropdown = dropdown
+            self.lang_prompt_name_entry = name_entry
+            self.lang_prompt_text = textbox
+        else:
+            self.adv_prompt_dropdown = dropdown
+            self.adv_prompt_name_entry = name_entry
+            self.adv_prompt_text = textbox
+
+    def _on_prompt_selected(self, choice, mode):
+        is_lang = (mode == "lang")
+        textbox = self.lang_prompt_text if is_lang else self.adv_prompt_text
+        presets = self.custom_lang_prompts if is_lang else self.custom_adv_prompts
+        default = DEFAULT_LANGUAGE_PROMPT if is_lang else DEFAULT_ADVANCED_PROMPT
+        textbox.delete("0.0", "end")
+        textbox.insert("0.0", presets.get(choice, default))
+
+    def _add_custom_prompt(self, mode):
+        is_lang = (mode == "lang")
+        name_entry = self.lang_prompt_name_entry if is_lang else self.adv_prompt_name_entry
+        textbox = self.lang_prompt_text if is_lang else self.adv_prompt_text
+        dropdown = self.lang_prompt_dropdown if is_lang else self.adv_prompt_dropdown
+        presets = self.custom_lang_prompts if is_lang else self.custom_adv_prompts
+        name = name_entry.get().strip()
         if not name or name.lower() == "default":
-            self.log("[WARNING] Nome de prompt inválido.")
+            self.log("[WARNING] Nome de preset inválido.")
             return
-        text = self.prompt_text.get("0.0", "end").strip()
-        self.custom_prompts[name] = text
-        self.prompt_name_entry.delete(0, "end")
-        opts = ["Default"] + list(self.custom_prompts.keys())
-        self.prompt_dropdown.configure(values=opts)
-        self.prompt_dropdown.set(name)
+        presets[name] = textbox.get("0.0", "end").strip()
+        name_entry.delete(0, "end")
+        opts = ["Default"] + list(presets.keys())
+        dropdown.configure(values=opts)
+        dropdown.set(name)
         self.save_folder_paths()
 
-    def _del_custom_prompt(self):
-        choice = self.prompt_dropdown.get()
+    def _del_custom_prompt(self, mode):
+        is_lang = (mode == "lang")
+        dropdown = self.lang_prompt_dropdown if is_lang else self.adv_prompt_dropdown
+        presets = self.custom_lang_prompts if is_lang else self.custom_adv_prompts
+        choice = dropdown.get()
         if choice == "Default":
             return
-        if choice in self.custom_prompts:
-            del self.custom_prompts[choice]
-            opts = ["Default"] + list(self.custom_prompts.keys())
-            self.prompt_dropdown.configure(values=opts)
-            self.prompt_dropdown.set("Default")
-            self._on_prompt_selected("Default")
+        if choice in presets:
+            del presets[choice]
+            opts = ["Default"] + list(presets.keys())
+            dropdown.configure(values=opts)
+            dropdown.set("Default")
+            self._on_prompt_selected("Default", mode)
             self.save_folder_paths()
 
     def _set_all_books(self, checked: bool):
@@ -914,24 +972,25 @@ class TranslatorApp(ctk.CTk):
         url = self.url_entry.get()
         model = self.model_entry.get()
         workers = int(self.worker_slider.get())
-        prompt = self.prompt_text.get("0.0", "end").strip()
+        lang_prompt = self.lang_prompt_text.get("0.0", "end").strip()
+        adv_prompt = self.adv_prompt_text.get("0.0", "end").strip()
         glossary = self.glossary_text.get("0.0", "end").strip()
         use_ctx = bool(self.context_checkbox.get())
-        
+
+        # Inject glossary into language prompt
         if glossary:
             glossary_block = f"TERMINOLOGY TO KEEP (DYNAMIC GLOSSARY):\n{glossary}"
         else:
             glossary_block = ""
-            
-        if "{GLOSSARY_SECTION}" in prompt:
-            prompt = prompt.replace("{GLOSSARY_SECTION}", glossary_block)
+        if "{GLOSSARY_SECTION}" in lang_prompt:
+            lang_prompt = lang_prompt.replace("{GLOSSARY_SECTION}", glossary_block)
         else:
-            prompt += "\n" + glossary_block
+            lang_prompt += "\n" + glossary_block
 
-        # Disparar numa worker thread para garantir que o UI no se congele.
-        threading.Thread(target=self._worker_thread, args=(selected_files, url, model, workers, prompt, use_ctx), daemon=True).start()
+        # Disparar numa worker thread para garantir que o UI não se congele.
+        threading.Thread(target=self._worker_thread, args=(selected_files, url, model, workers, lang_prompt, adv_prompt, use_ctx), daemon=True).start()
 
-    def _worker_thread(self, files, url, model, workers, prompt, use_ctx):
+    def _worker_thread(self, files, url, model, workers, lang_prompt, adv_prompt, use_ctx):
         self.log(f"[INFO] A verificar conexão ao servidor local ({url})...")
         import urllib.request
         try:
@@ -948,17 +1007,18 @@ class TranslatorApp(ctk.CTk):
 
         for file in files:
             self.log(f"\n--- Iniciando: {os.path.basename(file)} ---")
-            
+
             output_file = output_path_for_epub(file, self.books_out_abs)
             self._queue_set_status(file, "RUNNING")
             file_start = time.time()
-            
+
             config = AppConfig(
                 input_file=file,
                 output_file=output_file,
                 model_name=model,
                 base_url=url,
-                system_prompt=prompt,
+                language_prompt=lang_prompt,
+                advanced_prompt=adv_prompt,
                 max_workers=workers,
                 use_context=use_ctx,
                 save_translation_report=bool(self.report_checkbox.get()),

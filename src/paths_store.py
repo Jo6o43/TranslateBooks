@@ -5,29 +5,13 @@ import json
 import os
 from pathlib import Path
 
+from src.config import DEFAULT_LANGUAGE_PROMPT, DEFAULT_ADVANCED_PROMPT
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "itranslatebooks_config.json"
 
 DEFAULT_BOOKS_IN = "books_IN"
 DEFAULT_BOOKS_OUT = "books_OUT"
-DEFAULT_SYSTEM_PROMPT = """You are an elite literary translator specializing in localizing Light Novels into Brazilian Portuguese (PT-BR).
-Your mission is to provide a fluent, pleasant, and natural translation, respecting the stylistic norms of Brazil.
-
-STYLISTIC GUIDELINES (PT-BR):
-1. GERUND: Use the natural Brazilian gerund natively (e.g., 'estou fazendo' instead of 'estou a fazer').
-2. PRONOUNS: Use natural Brazilian pronominal placement. It can sound more fluent to use proclisis (e.g., 'me deu' instead of 'deu-me').
-3. VOCABULARY: Use Brazilian vocabulary (e.g., 'tela', 'celular', 'trem', 'banheiro', 'geladeira').
-4. ADDRESS: Default to using 'você' for dialogues, preserving the classic informality of Light Novels.
-5. SUFFIXES: Maintain Japanese honorific suffixes (-san, -kun, -sama, -chan, -senpai, -sensei) naturally if they appear.
-
-{GLOSSARY_SECTION}
-
-TECHNICAL OUTPUT RULES:
-- The input contains XML tags `<t id="...">` housing text blocks to be translated.
-- Translate the text inside the `<t>` tags contextually.
-- KEEP the exact sequence and IDs of the `<t>` tags in your output. Do not break or invent IDs.
-- Preserve any internal HTML (like `<a>` or `<span>`) within the `<t>` tags strictly.
-- Return ONLY the final structured XML snippet. No comments, no explanations."""
 
 
 def _to_stored_path(user_value: str, default: str) -> str:
@@ -52,8 +36,10 @@ def load_app_settings() -> dict:
         "base_url": "http://127.0.0.1:1234/v1",
         "model_name": "qwen3-v1-8b-instruct",
         "max_workers": 3,
-        "system_prompt": DEFAULT_SYSTEM_PROMPT,
-        "custom_prompts": {},
+        "language_prompt": DEFAULT_LANGUAGE_PROMPT,
+        "custom_lang_prompts": {},
+        "advanced_prompt": DEFAULT_ADVANCED_PROMPT,
+        "custom_adv_prompts": {},
     }
     if not CONFIG_PATH.is_file():
         return default_settings
@@ -61,7 +47,7 @@ def load_app_settings() -> dict:
         data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return default_settings
-    
+
     inn = str(data.get("books_in_dir") or "").strip() or DEFAULT_BOOKS_IN
     out = str(data.get("books_out_dir") or "").strip() or DEFAULT_BOOKS_OUT
     gloss = str(data.get("glossary", ""))
@@ -70,8 +56,12 @@ def load_app_settings() -> dict:
     base_url = str(data.get("base_url") or "http://127.0.0.1:1234/v1")
     model_name = str(data.get("model_name") or "qwen3-v1-8b-instruct")
     max_workers = int(data.get("max_workers") or 3)
-    system_prompt = str(data.get("system_prompt") or DEFAULT_SYSTEM_PROMPT)
-    custom_prompts = data.get("custom_prompts", {})
+
+    # Dual-prompt support (with legacy single system_prompt migration)
+    language_prompt = str(data.get("language_prompt") or data.get("system_prompt") or DEFAULT_LANGUAGE_PROMPT)
+    custom_lang_prompts = data.get("custom_lang_prompts", data.get("custom_prompts", {}))
+    advanced_prompt = str(data.get("advanced_prompt") or DEFAULT_ADVANCED_PROMPT)
+    custom_adv_prompts = data.get("custom_adv_prompts", {})
 
     return {
         "books_in_dir": inn,
@@ -82,8 +72,10 @@ def load_app_settings() -> dict:
         "base_url": base_url,
         "model_name": model_name,
         "max_workers": max_workers,
-        "system_prompt": system_prompt,
-        "custom_prompts": custom_prompts,
+        "language_prompt": language_prompt,
+        "custom_lang_prompts": custom_lang_prompts,
+        "advanced_prompt": advanced_prompt,
+        "custom_adv_prompts": custom_adv_prompts,
     }
 
 
@@ -96,11 +88,15 @@ def save_app_settings(
     base_url: str = "http://127.0.0.1:1234/v1",
     model_name: str = "qwen3-v1-8b-instruct",
     max_workers: int = 3,
-    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-    custom_prompts: dict = None,
+    language_prompt: str = DEFAULT_LANGUAGE_PROMPT,
+    custom_lang_prompts: dict = None,
+    advanced_prompt: str = DEFAULT_ADVANCED_PROMPT,
+    custom_adv_prompts: dict = None,
 ) -> None:
-    if custom_prompts is None:
-        custom_prompts = {}
+    if custom_lang_prompts is None:
+        custom_lang_prompts = {}
+    if custom_adv_prompts is None:
+        custom_adv_prompts = {}
     payload = {
         "books_in_dir": _to_stored_path(books_in_dir, DEFAULT_BOOKS_IN),
         "books_out_dir": _to_stored_path(books_out_dir, DEFAULT_BOOKS_OUT),
@@ -110,8 +106,10 @@ def save_app_settings(
         "base_url": base_url,
         "model_name": model_name,
         "max_workers": max_workers,
-        "system_prompt": system_prompt,
-        "custom_prompts": custom_prompts,
+        "language_prompt": language_prompt,
+        "custom_lang_prompts": custom_lang_prompts,
+        "advanced_prompt": advanced_prompt,
+        "custom_adv_prompts": custom_adv_prompts,
     }
     CONFIG_PATH.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 

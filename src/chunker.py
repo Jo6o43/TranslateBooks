@@ -1,6 +1,39 @@
 import re
 from typing import List
 
+# ---------------------------------------------------------------------------
+# Drop-cap recombinator
+# Matches patterns like: <span>W</span>Quando  →  <span>Q</span>uando
+# Works for any single HTML tag wrapping exactly one letter, followed
+# immediately (no space) by a word whose first letter is *different* from the
+# trapped one (because the LLM translated the word but kept the original letter).
+# ---------------------------------------------------------------------------
+_DROP_CAP_RE = re.compile(
+    r'(<(?P<tag>[a-zA-Z][^>]*)>)'   # opening tag
+    r'[A-Za-zÀ-ÿ]'                  # single original (now orphaned) letter
+    r'(</[a-zA-Z]+>)'               # closing tag
+    r'\s*'                           # optional whitespace between tag and word
+    r'(?P<word>[A-ZÀ-Ÿ][A-Za-zÀ-ÿ]+)',  # translated word starting with uppercase
+)
+
+def _fix_drop_cap(m: re.Match) -> str:
+    word = m.group("word")
+    open_tag = m.group(1)
+    close_tag = m.group(3)
+    return f"{open_tag}{word[0]}{close_tag}{word[1:]}"
+
+
+def _postprocess(text: str) -> str:
+    """Apply formatting fixes to a translated text block."""
+    # 1. Fix drop-cap artefacts (e.g. <span>W</span>Quando → <span>Q</span>uando)
+    text = _DROP_CAP_RE.sub(_fix_drop_cap, text)
+    # 2. Ensure space after em-dash when followed directly by a letter
+    text = re.sub(r'—(?=[A-Za-zÀ-ÿ])', '— ', text)
+    # 3. Collapse multiple spaces into one (outside HTML tags content is fine)
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+    return text
+
+
 class DomBatcher:
     """Helper to group multiple BeautifulSoup tags into a single prompt input."""
     def __init__(self, max_chars=1500):
@@ -54,8 +87,8 @@ def parse_translated_batch(translated_xml: str) -> dict:
     
     # We aggressively find <t id="x">...</t>
     results = {}
-    pattern = re.compile(r'<t\s+id=["\']?(\d+)["\']?>(.*?)</t>', re.DOTALL)
+    pattern = re.compile(r'<t\s+id=["\'"]?(\d+)["\'"]?>(.*?)</t>', re.DOTALL)
     matches = pattern.findall(xml_str)
     for t_id, t_content in matches:
-        results[int(t_id)] = t_content.strip()
+        results[int(t_id)] = _postprocess(t_content.strip())
     return results
