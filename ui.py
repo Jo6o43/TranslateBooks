@@ -69,6 +69,7 @@ class TranslatorApp(ctk.CTk):
         self.cancel_event = threading.Event()
         self.is_running = False
         self.active_view = "explorer"  # explorer
+        self.custom_prompts = {}
         
         # Activity bar (VS Code leftmost)
         self.activitybar = ctk.CTkFrame(
@@ -583,6 +584,10 @@ class TranslatorApp(ctk.CTk):
         if hasattr(self, "prompt_text"):
             self.prompt_text.delete("0.0", "end")
             self.prompt_text.insert("0.0", s.get("system_prompt", DEFAULT_SYSTEM_PROMPT))
+            self.custom_prompts = s.get("custom_prompts", {})
+            if hasattr(self, "prompt_dropdown"):
+                opts = ["Default"] + list(self.custom_prompts.keys())
+                self.prompt_dropdown.configure(values=opts)
 
         self.books_path.configure(text=f"{s['books_in_dir'].rstrip(os.sep).rstrip('/')}/")
         self.status_right.configure(text=f"{s['books_in_dir']} → {s['books_out_dir']}")
@@ -597,7 +602,8 @@ class TranslatorApp(ctk.CTk):
             self.url_entry.get().strip(),
             self.model_entry.get().strip(),
             int(self.worker_slider.get()),
-            self.prompt_text.get("0.0", "end").strip()
+            self.prompt_text.get("0.0", "end").strip(),
+            self.custom_prompts
         )
         self._sync_books_paths_ui()
         self.refresh_books()
@@ -745,15 +751,30 @@ class TranslatorApp(ctk.CTk):
         wrap = ctk.CTkFrame(parent, fg_color="transparent")
         wrap.pack(fill="both", expand=True)
         wrap.grid_columnconfigure(0, weight=1)
-        wrap.grid_rowconfigure(1, weight=1)
+        wrap.grid_rowconfigure(2, weight=1)
 
         hint = ctk.CTkLabel(
             wrap,
-            text="Edite as regras/glossário aqui. Isso vale para a execução atual.",
+            text="Edite as regras/glossário ou selecione um preset salvo nas configurações.",
             text_color=CURSOR_MUTED,
             font=ctk.CTkFont(size=12),
         )
         hint.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+
+        top_bar = ctk.CTkFrame(wrap, fg_color="transparent")
+        top_bar.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+        self.prompt_dropdown = ctk.CTkOptionMenu(top_bar, values=["Default"], command=self._on_prompt_selected, corner_radius=R0)
+        self.prompt_dropdown.pack(side="left", padx=(0, 10))
+
+        self.prompt_name_entry = ctk.CTkEntry(top_bar, placeholder_text="Novo Preset...", corner_radius=R0)
+        self.prompt_name_entry.pack(side="left", padx=(0, 10))
+
+        self.add_prompt_btn = ctk.CTkButton(top_bar, text="+", width=36, corner_radius=R0, fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER, command=self._add_custom_prompt)
+        self.add_prompt_btn.pack(side="left", padx=(0, 5))
+
+        self.del_prompt_btn = ctk.CTkButton(top_bar, text="🗑", width=36, corner_radius=R0, fg_color=CURSOR_DANGER, hover_color=CURSOR_DANGER_HOVER, command=self._del_custom_prompt)
+        self.del_prompt_btn.pack(side="left")
 
         self.prompt_text = ctk.CTkTextbox(
             wrap,
@@ -763,8 +784,40 @@ class TranslatorApp(ctk.CTk):
             border_color=CURSOR_BORDER,
             corner_radius=R0,
         )
-        self.prompt_text.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.prompt_text.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
         self.prompt_text.insert("0.0", DEFAULT_SYSTEM_PROMPT)
+
+    def _on_prompt_selected(self, choice):
+        self.prompt_text.delete("0.0", "end")
+        if choice == "Default":
+            self.prompt_text.insert("0.0", DEFAULT_SYSTEM_PROMPT)
+        elif choice in self.custom_prompts:
+            self.prompt_text.insert("0.0", self.custom_prompts[choice])
+
+    def _add_custom_prompt(self):
+        name = self.prompt_name_entry.get().strip()
+        if not name or name.lower() == "default":
+            self.log("[WARNING] Nome de prompt inválido.")
+            return
+        text = self.prompt_text.get("0.0", "end").strip()
+        self.custom_prompts[name] = text
+        self.prompt_name_entry.delete(0, "end")
+        opts = ["Default"] + list(self.custom_prompts.keys())
+        self.prompt_dropdown.configure(values=opts)
+        self.prompt_dropdown.set(name)
+        self.save_folder_paths()
+
+    def _del_custom_prompt(self):
+        choice = self.prompt_dropdown.get()
+        if choice == "Default":
+            return
+        if choice in self.custom_prompts:
+            del self.custom_prompts[choice]
+            opts = ["Default"] + list(self.custom_prompts.keys())
+            self.prompt_dropdown.configure(values=opts)
+            self.prompt_dropdown.set("Default")
+            self._on_prompt_selected("Default")
+            self.save_folder_paths()
 
     def _set_all_books(self, checked: bool):
         for cb, _ in self.checkboxes:
@@ -796,7 +849,7 @@ class TranslatorApp(ctk.CTk):
                 corner_radius=R0,
             )
             cb.grid(row=i, column=0, padx=5, pady=5, sticky="w")
-            cb.select()  # Check by default
+            # Unselected by default as requested
             self.checkboxes.append((cb, file))
         self.set_status(f"{len(files)} file(s) found")
 

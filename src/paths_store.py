@@ -53,6 +53,7 @@ def load_app_settings() -> dict:
         "model_name": "qwen3-v1-8b-instruct",
         "max_workers": 3,
         "system_prompt": DEFAULT_SYSTEM_PROMPT,
+        "custom_prompts": {},
     }
     if not CONFIG_PATH.is_file():
         return default_settings
@@ -70,6 +71,7 @@ def load_app_settings() -> dict:
     model_name = str(data.get("model_name") or "qwen3-v1-8b-instruct")
     max_workers = int(data.get("max_workers") or 3)
     system_prompt = str(data.get("system_prompt") or DEFAULT_SYSTEM_PROMPT)
+    custom_prompts = data.get("custom_prompts", {})
 
     return {
         "books_in_dir": inn,
@@ -81,6 +83,7 @@ def load_app_settings() -> dict:
         "model_name": model_name,
         "max_workers": max_workers,
         "system_prompt": system_prompt,
+        "custom_prompts": custom_prompts,
     }
 
 
@@ -94,7 +97,10 @@ def save_app_settings(
     model_name: str = "qwen3-v1-8b-instruct",
     max_workers: int = 3,
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+    custom_prompts: dict = None,
 ) -> None:
+    if custom_prompts is None:
+        custom_prompts = {}
     payload = {
         "books_in_dir": _to_stored_path(books_in_dir, DEFAULT_BOOKS_IN),
         "books_out_dir": _to_stored_path(books_out_dir, DEFAULT_BOOKS_OUT),
@@ -105,6 +111,7 @@ def save_app_settings(
         "model_name": model_name,
         "max_workers": max_workers,
         "system_prompt": system_prompt,
+        "custom_prompts": custom_prompts,
     }
     CONFIG_PATH.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 

@@ -47,6 +47,20 @@ async def translate_batch_cached(xml_payload: str, config: AppConfig, context_st
         save_translation(xml_payload, translated, epub_filename)
         return translated
     except Exception as e:
+        error_str = str(e)
+        if "Context size has been exceeded" in error_str and context_str:
+            warn_msg = f"Fallback ativado: Limite de Contexto (Context Size) ultrapassado. Bloco salvo ignorando o histórico (contexto).\nConteúdo Inicial do Bloco (HTML/Parágrafo): {xml_payload[:150]}..."
+            if error_log is not None:
+                error_log.append(warn_msg)
+            if log_callback:
+                log_callback(f"\n[WARNING] Limite de Contexto ultrapassado! A tentar traduzir o bloco isoladamente sem o contexto anterior para não interromper...")
+            try:
+                translated = await _call_llm(xml_payload, config, "")
+                save_translation(xml_payload, translated, epub_filename)
+                return translated
+            except Exception as e2:
+                e = e2
+
         tb = traceback.format_exc()
         msg = f"\n[ERROR] Translation failed after 4 retries. Skipping chunk. Reason: {e}\nStacktrace: {tb}\nPayload: {xml_payload[:200]}..."
         if log_callback:
