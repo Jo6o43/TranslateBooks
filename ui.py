@@ -443,6 +443,14 @@ class TranslatorApp(ctk.CTk):
         self.queue_items = []
         self._render_queue()
 
+    def remove_from_queue(self, input_file):
+        if self.is_running:
+            self.log("[WARNING] Não é possível remover da queue durante execução.")
+            return
+        self.queue_items = [item for item in self.queue_items if item.get("input") != input_file]
+        self._render_queue()
+        self.log(f"[INFO] Removido da fila: {os.path.basename(input_file)}")
+
     def _queue_status_color(self, status: str) -> str:
         status = (status or "").upper()
         if status == "RUNNING":
@@ -496,7 +504,21 @@ class TranslatorApp(ctk.CTk):
                 command=(lambda p=out_path: self._safe_startfile(p)) if out_path else None,
                 state=("normal" if (out_path and status.upper() == "DONE") else "disabled"),
             )
-            open_btn.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+            open_btn.grid(row=0, column=1, padx=(10, 5), pady=10, sticky="e")
+
+            remove_btn = ctk.CTkButton(
+                row,
+                text="Remover",
+                width=74,
+                corner_radius=R0,
+                fg_color=CURSOR_DANGER,
+                hover_color=CURSOR_DANGER_HOVER,
+                border_width=1,
+                border_color=CURSOR_BORDER,
+                command=lambda f=item.get("input"): self.remove_from_queue(f),
+                state="disabled" if self.is_running else "normal",
+            )
+            remove_btn.grid(row=0, column=2, padx=(0, 10), pady=10, sticky="e")
 
     def _queue_set_status(self, input_file: str, status: str, seconds: float | None = None):
         for item in self.queue_items:
