@@ -24,13 +24,14 @@ CURSOR_SIDEBAR = "#161616"
 CURSOR_ACTIVITYBAR = "#0f0f0f"
 CURSOR_BORDER = "#2b2b2b"
 CURSOR_TEXT = "#e4e4e7"
-CURSOR_MUTED = "#71717a"
+CURSOR_MUTED = "#a1a1aa"
 CURSOR_ACCENT = "#8b5cf6"
 CURSOR_ACCENT_HOVER = "#a78bfa"
-CURSOR_SUCCESS = "#34d399"
-CURSOR_SUCCESS_HOVER = "#10b981"
-CURSOR_DANGER = "#f87171"
-CURSOR_DANGER_HOVER = "#ef4444"
+CURSOR_SUCCESS = "#22c55e"
+CURSOR_SUCCESS_HOVER = "#16a34a"
+CURSOR_DANGER = "#ef4444"
+CURSOR_DANGER_HOVER = "#dc2626"
+CURSOR_FOCUS = "#f59e0b"
 
 # Cantos rectos (alinhado a IDE; evita “gaps” entre bordas e widgets arredondados)
 R0 = 0
@@ -56,7 +57,7 @@ class TranslatorApp(ctk.CTk):
         # col 0: activity bar
         # col 1: side bar
         # col 2: main editor area
-        self.grid_columnconfigure(0, minsize=56)
+        self.grid_columnconfigure(0, minsize=96)
         self.grid_columnconfigure(1, minsize=320)
         self.grid_columnconfigure(2, weight=1)
         # row 0: content
@@ -84,55 +85,75 @@ class TranslatorApp(ctk.CTk):
 
         self.btn_explorer = ctk.CTkButton(
             self.activitybar,
-            text="📂",
-            width=44,
+            text="Explorer",
+            width=78,
             height=44,
             corner_radius=R0,
             fg_color=CURSOR_ACCENT,
             hover_color=CURSOR_ACCENT_HOVER,
-            font=ctk.CTkFont(size=22),
+            font=ctk.CTkFont(size=12, weight="bold"),
             command=lambda: self.set_view("explorer"),
         )
         self.btn_explorer.grid(row=0, column=0, padx=6, pady=(8, 6))
+        self._make_accessible(
+            self.btn_explorer,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_ACTIVITYBAR},
+        )
 
         self.btn_lang_prompt = ctk.CTkButton(
             self.activitybar,
-            text="🌐",
-            width=44,
+            text="Idioma",
+            width=78,
             height=44,
             corner_radius=R0,
             fg_color=CURSOR_ACTIVITYBAR,
             hover_color=CURSOR_PANEL,
-            font=ctk.CTkFont(size=22),
+            font=ctk.CTkFont(size=12, weight="bold"),
             command=lambda: self.set_view("lang_prompt"),
         )
         self.btn_lang_prompt.grid(row=1, column=0, padx=6, pady=6)
+        self._make_accessible(
+            self.btn_lang_prompt,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_ACTIVITYBAR},
+        )
 
         self.btn_adv_prompt = ctk.CTkButton(
             self.activitybar,
-            text="🔧",
-            width=44,
+            text="Avançado",
+            width=78,
             height=44,
             corner_radius=R0,
             fg_color=CURSOR_ACTIVITYBAR,
             hover_color=CURSOR_PANEL,
-            font=ctk.CTkFont(size=22),
+            font=ctk.CTkFont(size=12, weight="bold"),
             command=lambda: self.set_view("adv_prompt"),
         )
         self.btn_adv_prompt.grid(row=2, column=0, padx=6, pady=6)
+        self._make_accessible(
+            self.btn_adv_prompt,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_ACTIVITYBAR},
+        )
 
         self.btn_settings = ctk.CTkButton(
             self.activitybar,
-            text="⚙",
-            width=44,
+            text="Definições",
+            width=78,
             height=44,
             corner_radius=R0,
             fg_color=CURSOR_ACTIVITYBAR,
             hover_color=CURSOR_PANEL,
-            font=ctk.CTkFont(size=22),
+            font=ctk.CTkFont(size=12, weight="bold"),
             command=lambda: self.set_view("settings"),
         )
         self.btn_settings.grid(row=3, column=0, padx=6, pady=6)
+        self._make_accessible(
+            self.btn_settings,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_ACTIVITYBAR},
+        )
 
         # Side bar (Explorer / Settings)
         self.sidebar = ctk.CTkFrame(
@@ -285,6 +306,7 @@ class TranslatorApp(ctk.CTk):
         self._build_prompt_view(self.view_adv_prompt, mode="adv")
         self._sync_books_paths_ui()
         self.refresh_books()
+        self._register_keyboard_shortcuts()
         self.set_view("explorer")
 
     def update_slider_label(self, value):
@@ -295,6 +317,54 @@ class TranslatorApp(ctk.CTk):
 
     def set_status(self, text: str):
         self.status_left.configure(text=text)
+
+    def _safe_configure(self, widget, **kwargs):
+        try:
+            widget.configure(**kwargs)
+        except Exception:
+            pass
+
+    def _make_accessible(self, widget, focus_style: dict, idle_style: dict | None = None):
+        if idle_style is None:
+            idle_style = {}
+        self._safe_configure(widget, takefocus=True)
+        widget.bind(
+            "<FocusIn>",
+            lambda _event, w=widget, style=focus_style: self._safe_configure(w, **style),
+            add="+",
+        )
+        widget.bind(
+            "<FocusOut>",
+            lambda _event, w=widget, style=idle_style: self._safe_configure(w, **style),
+            add="+",
+        )
+
+    def _register_keyboard_shortcuts(self):
+        self.bind_all("<Alt-KeyPress-1>", lambda _event: self.set_view("explorer"), add="+")
+        self.bind_all("<Alt-KeyPress-2>", lambda _event: self.set_view("lang_prompt"), add="+")
+        self.bind_all("<Alt-KeyPress-3>", lambda _event: self.set_view("adv_prompt"), add="+")
+        self.bind_all("<Alt-KeyPress-4>", lambda _event: self.set_view("settings"), add="+")
+        self.bind_all("<Control-Return>", lambda _event: self.start_translation(), add="+")
+        self.bind_all("<Escape>", lambda _event: self.stop_translation(), add="+")
+        self.bind_all("<F5>", lambda _event: self.refresh_books() if self.active_view == "explorer" else None, add="+")
+        self.bind_all("<Control-r>", lambda _event: self.refresh_books() if self.active_view == "explorer" else None, add="+")
+        self.bind_all("<Control-s>", lambda _event: self.save_folder_paths(), add="+")
+
+    def _focus_active_view(self):
+        target = None
+        if self.active_view == "explorer":
+            target = self.checkboxes[0][0] if self.checkboxes else self.refresh_btn
+        elif self.active_view == "lang_prompt":
+            target = self.lang_prompt_dropdown
+        elif self.active_view == "adv_prompt":
+            target = self.adv_prompt_dropdown
+        else:
+            target = self.books_in_entry if hasattr(self, "books_in_entry") else None
+        if target is not None:
+            try:
+                target.focus_set()
+            except Exception:
+                pass
 
     def _safe_startfile(self, path: str):
         try:
@@ -332,9 +402,12 @@ class TranslatorApp(ctk.CTk):
         self.console.configure(state="disabled")
 
     def reset_system_prompt(self):
-        self.prompt_text.delete("0.0", "end")
-        self.prompt_text.insert("0.0", DEFAULT_SYSTEM_PROMPT)
-        self.set_view("prompt")
+        if hasattr(self, "lang_prompt_text"):
+            self.lang_prompt_text.delete("0.0", "end")
+            self.lang_prompt_text.insert("0.0", DEFAULT_LANGUAGE_PROMPT)
+            self.lang_prompt_dropdown.set("Default")
+            self.lang_del_btn.configure(state="disabled")
+            self.set_view("lang_prompt")
 
     def _build_queue_panel(self):
         self.queue_panel = ctk.CTkFrame(self.editor_body, fg_color=CURSOR_PANEL, corner_radius=R0, border_width=1, border_color=CURSOR_BORDER)
@@ -364,6 +437,11 @@ class TranslatorApp(ctk.CTk):
             command=self.clear_queue,
         )
         self.queue_clear_btn.pack(side="left", padx=(0, 8))
+        self._make_accessible(
+            self.queue_clear_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         self.queue_open_in_btn = ctk.CTkButton(
             actions,
@@ -377,6 +455,11 @@ class TranslatorApp(ctk.CTk):
             command=self.open_books_in_folder,
         )
         self.queue_open_in_btn.pack(side="left", padx=(0, 8))
+        self._make_accessible(
+            self.queue_open_in_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         self.queue_open_out_btn = ctk.CTkButton(
             actions,
@@ -390,6 +473,11 @@ class TranslatorApp(ctk.CTk):
             command=self.open_books_out_folder,
         )
         self.queue_open_out_btn.pack(side="left")
+        self._make_accessible(
+            self.queue_open_out_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         self.queue_list = ctk.CTkScrollableFrame(self.queue_panel, fg_color="transparent", label_text="", corner_radius=R0)
         self.queue_list.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
@@ -421,6 +509,11 @@ class TranslatorApp(ctk.CTk):
             command=self.start_translation,
         )
         self.run_btn.pack(side="left", padx=(0, 8))
+        self._make_accessible(
+            self.run_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_SUCCESS},
+        )
 
         self.stop_btn = ctk.CTkButton(
             self.run_controls,
@@ -433,6 +526,11 @@ class TranslatorApp(ctk.CTk):
             state="disabled",
         )
         self.stop_btn.pack(side="left")
+        self._make_accessible(
+            self.stop_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_DANGER},
+        )
 
         self._render_queue()
 
@@ -461,6 +559,18 @@ class TranslatorApp(ctk.CTk):
             return CURSOR_DANGER
         return CURSOR_MUTED
 
+    def _queue_status_label(self, status: str) -> str:
+        status = (status or "").upper()
+        if status == "RUNNING":
+            return "EM EXECUÇÃO"
+        if status == "DONE":
+            return "CONCLUÍDO"
+        if status == "FAILED":
+            return "FALHOU"
+        if status == "CANCELLED":
+            return "CANCELADO"
+        return "PENDENTE"
+
     def _render_queue(self):
         for child in self.queue_list.winfo_children():
             child.destroy()
@@ -488,7 +598,7 @@ class TranslatorApp(ctk.CTk):
             name_lbl = ctk.CTkLabel(left, text=base, text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12), anchor="w")
             name_lbl.grid(row=0, column=0, sticky="w")
 
-            meta = f"{status}{(' • ' + dur) if dur else ''}"
+            meta = f"{self._queue_status_label(status)}{(' • ' + dur) if dur else ''}"
             status_lbl = ctk.CTkLabel(left, text=meta, text_color=self._queue_status_color(status), font=ctk.CTkFont(size=11))
             status_lbl.grid(row=1, column=0, sticky="w", pady=(2, 0))
 
@@ -552,6 +662,7 @@ class TranslatorApp(ctk.CTk):
             self.sidebar_title.configure(text="DEFINIÇÕES")
             self.view_settings.tkraise()
             self.btn_settings.configure(fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER)
+        self.after(0, self._focus_active_view)
 
     def _build_explorer_view(self, parent):
         self.explorer_view = ctk.CTkFrame(parent, fg_color="transparent")
@@ -578,6 +689,11 @@ class TranslatorApp(ctk.CTk):
             command=self.refresh_books,
         )
         self.refresh_btn.grid(row=0, column=1, sticky="e")
+        self._make_accessible(
+            self.refresh_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         self.books_frame = ctk.CTkScrollableFrame(self.explorer_view, fg_color="transparent", label_text="", corner_radius=R0)
         self.books_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
@@ -602,6 +718,11 @@ class TranslatorApp(ctk.CTk):
             command=lambda: self._set_all_books(True),
         )
         self.select_all_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self._make_accessible(
+            self.select_all_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         self.clear_all_btn = ctk.CTkButton(
             sel_frame,
@@ -614,6 +735,11 @@ class TranslatorApp(ctk.CTk):
             command=lambda: self._set_all_books(False),
         )
         self.clear_all_btn.grid(row=0, column=1, sticky="ew")
+        self._make_accessible(
+            self.clear_all_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         self.add_to_queue_btn = ctk.CTkButton(
             footer,
@@ -626,6 +752,11 @@ class TranslatorApp(ctk.CTk):
             command=self.add_selected_to_queue,
         )
         self.add_to_queue_btn.grid(row=1, column=0, sticky="ew")
+        self._make_accessible(
+            self.add_to_queue_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
     def add_selected_to_queue(self):
         selected_files = [file for cb, file in self.checkboxes if cb.get()]
@@ -743,14 +874,20 @@ class TranslatorApp(ctk.CTk):
         top_bar = ctk.CTkFrame(wrap, fg_color="transparent")
         top_bar.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
 
-        ctk.CTkButton(
+        save_btn = ctk.CTkButton(
             top_bar,
             text="Guardar Definições",
             corner_radius=R0,
             fg_color=CURSOR_ACCENT,
             hover_color=CURSOR_ACCENT_HOVER,
             command=self.save_folder_paths,
-        ).pack(side="left")
+        )
+        save_btn.pack(side="left")
+        self._make_accessible(
+            save_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_ACCENT},
+        )
 
         form = ctk.CTkScrollableFrame(wrap, fg_color=CURSOR_PANEL, corner_radius=R0, border_width=1, border_color=CURSOR_BORDER)
         form.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
@@ -758,7 +895,7 @@ class TranslatorApp(ctk.CTk):
 
         s0 = load_app_settings()
 
-        self.books_in_label = ctk.CTkLabel(form, text="Pasta entrada (EPUBs)", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
+        self.books_in_label = ctk.CTkLabel(form, text="Pasta de entrada (EPUBs a processar)", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
         self.books_in_label.grid(row=0, column=0, padx=12, pady=(12, 4), sticky="w")
 
         in_row = ctk.CTkFrame(form, fg_color="transparent")
@@ -768,8 +905,13 @@ class TranslatorApp(ctk.CTk):
         self.books_in_entry = ctk.CTkEntry(in_row, placeholder_text="books_IN", corner_radius=R0)
         self.books_in_entry.grid(row=0, column=0, padx=(0, 8), sticky="ew")
         self.books_in_entry.insert(0, s0["books_in_dir"])
+        self._make_accessible(
+            self.books_in_entry,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
-        ctk.CTkButton(
+        browse_in_btn = ctk.CTkButton(
             in_row,
             text="…",
             width=36,
@@ -779,9 +921,15 @@ class TranslatorApp(ctk.CTk):
             border_width=1,
             border_color=CURSOR_BORDER,
             command=self.browse_books_in,
-        ).grid(row=0, column=1, sticky="e")
+        )
+        browse_in_btn.grid(row=0, column=1, sticky="e")
+        self._make_accessible(
+            browse_in_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
-        self.books_out_label = ctk.CTkLabel(form, text="Pasta saída (traduzidos)", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
+        self.books_out_label = ctk.CTkLabel(form, text="Pasta de saída (EPUBs traduzidos)", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
         self.books_out_label.grid(row=2, column=0, padx=12, pady=(4, 4), sticky="w")
 
         out_row = ctk.CTkFrame(form, fg_color="transparent")
@@ -791,8 +939,13 @@ class TranslatorApp(ctk.CTk):
         self.books_out_entry = ctk.CTkEntry(out_row, placeholder_text="books_OUT", corner_radius=R0)
         self.books_out_entry.grid(row=0, column=0, padx=(0, 8), sticky="ew")
         self.books_out_entry.insert(0, s0["books_out_dir"])
+        self._make_accessible(
+            self.books_out_entry,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
-        ctk.CTkButton(
+        browse_out_btn = ctk.CTkButton(
             out_row,
             text="…",
             width=36,
@@ -802,23 +955,39 @@ class TranslatorApp(ctk.CTk):
             border_width=1,
             border_color=CURSOR_BORDER,
             command=self.browse_books_out,
-        ).grid(row=0, column=1, sticky="e")
+        )
+        browse_out_btn.grid(row=0, column=1, sticky="e")
+        self._make_accessible(
+            browse_out_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
-        self.url_label = ctk.CTkLabel(form, text="Base URL", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
+        self.url_label = ctk.CTkLabel(form, text="Base URL da API local", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
         self.url_label.grid(row=4, column=0, padx=12, pady=(4, 4), sticky="w")
 
         self.url_entry = ctk.CTkEntry(form, placeholder_text="http://127.0.0.1:1234/v1", corner_radius=R0)
         self.url_entry.grid(row=5, column=0, padx=12, pady=(0, 10), sticky="ew")
         self.url_entry.insert(0, "http://127.0.0.1:1234/v1")
+        self._make_accessible(
+            self.url_entry,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
-        self.model_label = ctk.CTkLabel(form, text="Model", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
+        self.model_label = ctk.CTkLabel(form, text="Modelo exposto pela API", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
         self.model_label.grid(row=6, column=0, padx=12, pady=(0, 4), sticky="w")
 
         self.model_entry = ctk.CTkEntry(form, placeholder_text="qwen3-v1-8b-instruct", corner_radius=R0)
         self.model_entry.grid(row=7, column=0, padx=12, pady=(0, 10), sticky="ew")
         self.model_entry.insert(0, "qwen3-v1-8b-instruct")
+        self._make_accessible(
+            self.model_entry,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
-        self.slider_label = ctk.CTkLabel(form, text="Workers: 3", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
+        self.slider_label = ctk.CTkLabel(form, text="Workers: 3 (processamento paralelo)", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
         self.slider_label.grid(row=8, column=0, padx=12, pady=(0, 2), sticky="w")
 
         self.worker_slider = ctk.CTkSlider(
@@ -832,8 +1001,13 @@ class TranslatorApp(ctk.CTk):
         )
         self.worker_slider.set(3)
         self.worker_slider.grid(row=9, column=0, padx=12, pady=(0, 12), sticky="ew")
+        self._make_accessible(
+            self.worker_slider,
+            {"button_color": CURSOR_FOCUS, "progress_color": CURSOR_FOCUS},
+            {"button_color": CURSOR_ACCENT, "progress_color": CURSOR_ACCENT},
+        )
 
-        self.temp_label = ctk.CTkLabel(form, text=f"Temperature: {float(s0.get('temperature', 0.4)):.2f}", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
+        self.temp_label = ctk.CTkLabel(form, text=f"Temperature: {float(s0.get('temperature', 0.4)):.2f} (mais alto = mais livre)", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12))
         self.temp_label.grid(row=10, column=0, padx=12, pady=(0, 2), sticky="w")
 
         self.temp_slider = ctk.CTkSlider(
@@ -847,15 +1021,30 @@ class TranslatorApp(ctk.CTk):
         )
         self.temp_slider.set(float(s0.get("temperature", 0.4)))
         self.temp_slider.grid(row=11, column=0, padx=12, pady=(0, 12), sticky="ew")
+        self._make_accessible(
+            self.temp_slider,
+            {"button_color": CURSOR_FOCUS, "progress_color": CURSOR_FOCUS},
+            {"button_color": CURSOR_ACCENT, "progress_color": CURSOR_ACCENT},
+        )
 
-        self.glossary_label = ctk.CTkLabel(form, text="Glossário Dinâmico (Presets salvos em JSON):\nEscreva Ex: 'Mage: Mago'", text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12), justify="left")
+        self.glossary_label = ctk.CTkLabel(form, text="Glossário Dinâmico\nPresets salvos em JSON. Exemplo: 'Mage: Mago'", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=12), justify="left")
         self.glossary_label.grid(row=12, column=0, padx=12, pady=(4, 4), sticky="w")
 
         self.glossary_text = ctk.CTkTextbox(form, height=60, corner_radius=R0)
         self.glossary_text.grid(row=13, column=0, padx=12, pady=(0, 8), sticky="ew")
+        self._make_accessible(
+            self.glossary_text,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         self.context_checkbox = ctk.CTkCheckBox(form, text="Usar Contexto Anterior (Reduz alucinações de gêneros, ligeiramente mais lento)", corner_radius=R0)
         self.context_checkbox.grid(row=14, column=0, padx=12, pady=(4, 8), sticky="w")
+        self._make_accessible(
+            self.context_checkbox,
+            {"border_color": CURSOR_FOCUS},
+            {"border_color": CURSOR_BORDER},
+        )
 
         self.report_checkbox = ctk.CTkCheckBox(
             form,
@@ -863,6 +1052,11 @@ class TranslatorApp(ctk.CTk):
             corner_radius=R0,
         )
         self.report_checkbox.grid(row=15, column=0, padx=12, pady=(0, 8), sticky="w")
+        self._make_accessible(
+            self.report_checkbox,
+            {"border_color": CURSOR_FOCUS},
+            {"border_color": CURSOR_BORDER},
+        )
         if s0.get("save_translation_report", False):
             self.report_checkbox.select()
 
@@ -893,31 +1087,66 @@ class TranslatorApp(ctk.CTk):
         hint = ctk.CTkLabel(wrap, text=hint_text, text_color=CURSOR_MUTED, font=ctk.CTkFont(size=12))
         hint.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
 
-        top_bar = ctk.CTkFrame(wrap, fg_color="transparent")
-        top_bar.grid(row=1, column=0, padx=10, pady=(8, 0), sticky="ew")
+        controls = ctk.CTkFrame(wrap, fg_color="transparent")
+        controls.grid(row=1, column=0, padx=10, pady=(8, 0), sticky="ew")
+        controls.grid_columnconfigure(0, weight=1)
+        controls.grid_columnconfigure(1, weight=1)
+
+        preset_col = ctk.CTkFrame(controls, fg_color="transparent")
+        preset_col.grid(row=0, column=0, padx=(0, 10), sticky="ew")
+        preset_col.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(preset_col, text="Selecione um preset", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=11, weight="bold")).grid(row=0, column=0, sticky="w", pady=(0, 4))
 
         dropdown = ctk.CTkOptionMenu(
-            top_bar, values=["Default"],
+            preset_col, values=["Default"],
             command=lambda c, m=mode: self._on_prompt_selected(c, m),
             corner_radius=R0,
         )
-        dropdown.pack(side="left", padx=(0, 10))
+        dropdown.grid(row=1, column=0, sticky="ew")
+        self._make_accessible(
+            dropdown,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
-        name_entry = ctk.CTkEntry(top_bar, placeholder_text="Novo Preset...", corner_radius=R0)
-        name_entry.pack(side="left", padx=(0, 10))
+        name_col = ctk.CTkFrame(controls, fg_color="transparent")
+        name_col.grid(row=0, column=1, sticky="ew")
+        name_col.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkButton(
-            top_bar, text="+", width=36, corner_radius=R0,
+        ctk.CTkLabel(name_col, text="Novo preset", text_color=CURSOR_TEXT, font=ctk.CTkFont(size=11, weight="bold")).grid(row=0, column=0, sticky="w", pady=(0, 4))
+
+        name_entry = ctk.CTkEntry(name_col, placeholder_text="Novo Preset...", corner_radius=R0)
+        name_entry.grid(row=1, column=0, sticky="ew")
+        self._make_accessible(
+            name_entry,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
+
+        add_prompt_btn = ctk.CTkButton(
+            controls, text="+", width=36, corner_radius=R0,
             fg_color=CURSOR_ACCENT, hover_color=CURSOR_ACCENT_HOVER,
             command=lambda m=mode: self._add_custom_prompt(m),
-        ).pack(side="left", padx=(0, 5))
+        )
+        add_prompt_btn.grid(row=0, column=2, padx=(10, 5), pady=(20, 0), sticky="e")
+        self._make_accessible(
+            add_prompt_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_ACCENT},
+        )
 
         del_btn = ctk.CTkButton(
-            top_bar, text="🗑", width=36, corner_radius=R0,
+            controls, text="Remover", width=74, corner_radius=R0,
             fg_color=CURSOR_DANGER, hover_color=CURSOR_DANGER_HOVER,
             command=lambda m=mode: self._del_custom_prompt(m),
         )
-        del_btn.pack(side="left")
+        del_btn.grid(row=0, column=3, padx=(0, 0), pady=(20, 0), sticky="e")
+        self._make_accessible(
+            del_btn,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 0, "border_color": CURSOR_DANGER},
+        )
 
         # disable delete for Default on init
         del_btn.configure(state="disabled")
@@ -928,6 +1157,11 @@ class TranslatorApp(ctk.CTk):
         )
         textbox.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
         textbox.insert("0.0", default_text)
+        self._make_accessible(
+            textbox,
+            {"border_width": 2, "border_color": CURSOR_FOCUS},
+            {"border_width": 1, "border_color": CURSOR_BORDER},
+        )
 
         if is_lang:
             self.lang_prompt_dropdown = dropdown
@@ -1015,9 +1249,15 @@ class TranslatorApp(ctk.CTk):
                 corner_radius=R0,
             )
             cb.grid(row=i, column=0, padx=5, pady=5, sticky="w")
+            self._make_accessible(
+                cb,
+                {"border_color": CURSOR_FOCUS},
+                {"border_color": CURSOR_BORDER},
+            )
             # Unselected by default as requested
             self.checkboxes.append((cb, file))
-        self.set_status(f"{len(files)} file(s) found")
+        self.set_status(f"{len(files)} EPUB(s) encontrados em books_IN")
+        self._focus_active_view()
 
     def log(self, msg):
         _MAX_LINES = 800
@@ -1049,15 +1289,19 @@ class TranslatorApp(ctk.CTk):
             self.progress_bar.set(current / total if total > 0 else 0)
             tps_str = f" | Speed: {tps:.1f} t/s" if tps and tps > 0 else ""
             self.eta_label.configure(text=f"{pct}% | ETA: {time_str}{tps_str} | {current}/{total}")
-            self.set_status(f"Running… {pct}%")
+            self.set_status(f"Em processamento: {current}/{total} ({pct}%)")
         self.after(0, update)
 
     def stop_translation(self):
         if self.is_running:
             self.cancel_event.set()
-            self.log("[INFO] Pedido de paragem forçada emitido. Aguardando o descarregamento das threads ativas...")
+            self.log("[INFO] Pedido de cancelamento emitido. A aguardar o encerramento das tarefas ativas...")
             self.stop_btn.configure(state="disabled")
-            self.set_status("Stopping…")
+            self.set_status("A cancelar tradução")
+            try:
+                self.stop_btn.focus_set()
+            except Exception:
+                pass
 
     def start_translation(self):
         if self.is_running:
@@ -1073,16 +1317,21 @@ class TranslatorApp(ctk.CTk):
 
         selected_files = [item["input"] for item in self.queue_items if item.get("status") == "PENDING"]
         if not selected_files:
-            self.log("[WARNING] A Fila não tem livros pendentes para traduzir!")
+            self.log("[WARNING] Não há livros pendentes na fila para traduzir.")
+            self.set_status("Nenhum livro pendente na fila")
             return
 
         self.is_running = True
         self.cancel_event.clear()
         self.run_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
-        self.set_status("Running…")
+        self.set_status(f"Tradução iniciada para {len(selected_files)} livro(s)")
         self.log("\n" + "="*40)
-        self.log(f"[INFO] A iniciar tradução de {len(selected_files)} livros pendentes...")
+        self.log(f"[INFO] Tradução iniciada para {len(selected_files)} livro(s) pendente(s).")
+        try:
+            self.stop_btn.focus_set()
+        except Exception:
+            pass
         
         url = self.url_entry.get()
         model = self.model_entry.get()
@@ -1114,12 +1363,16 @@ class TranslatorApp(ctk.CTk):
             with urllib.request.urlopen(req, timeout=3):
                 pass
         except Exception:
-            self.log(f"[ERROR] O servidor falhou (LM Studio não está a correr em {url}). Tradução cancelada!")
+            self.log(f"[ERROR] O servidor local falhou (LM Studio não está a correr em {url}). Tradução cancelada.")
             self.after(0, lambda: self.run_btn.configure(state="normal"))
             self.after(0, lambda: self.stop_btn.configure(state="disabled"))
-            self.after(0, lambda: self.set_status("Ready"))
+            self.after(0, lambda: self.set_status("Falha na ligação ao servidor local"))
             self.is_running = False
             return
+
+        succeeded = 0
+        failed = 0
+        cancelled = 0
 
         for file in files:
             self.log(f"\n--- Iniciando: {os.path.basename(file)} ---")
@@ -1149,8 +1402,10 @@ class TranslatorApp(ctk.CTk):
             elapsed = time.time() - file_start
 
             if success:
+                succeeded += 1
                 self._queue_set_status(file, "DONE", elapsed)
             elif self.cancel_event.is_set():
+                cancelled += 1
                 self._queue_set_status(file, "CANCELLED", elapsed)
                 for item in self.queue_items:
                     if item.get("status") == "PENDING":
@@ -1158,12 +1413,21 @@ class TranslatorApp(ctk.CTk):
                 self.after(0, self._render_queue)
                 break
             else:
+                failed += 1
                 self._queue_set_status(file, "FAILED", elapsed)
             
-        self.log("\n[INFO] Fila de processos finalizada.")
+        if self.cancel_event.is_set():
+            final_status = f"Tradução cancelada após {succeeded} livro(s) concluído(s)"
+        elif failed:
+            final_status = f"Tradução concluída com {failed} falha(s)"
+        else:
+            final_status = f"Tradução concluída com {succeeded} livro(s)"
+
+        self.log(f"\n[INFO] {final_status}.")
         self.after(0, lambda: self.run_btn.configure(state="normal"))
         self.after(0, lambda: self.stop_btn.configure(state="disabled"))
-        self.after(0, lambda: self.set_status("Ready"))
+        self.after(0, lambda: self.set_status(final_status))
+        self.after(0, lambda: self.run_btn.focus_set())
         self.is_running = False
 
 if __name__ == "__main__":
